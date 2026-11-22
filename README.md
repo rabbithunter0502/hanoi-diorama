@@ -1,6 +1,8 @@
 # Hà Nội · Diorama 3D
 
-Interactive Three.js miniature of Hà Nội — same genre as [Đà Nẵng · Diorama 3D](https://danang-diorama.netlify.app/), with Hoàn Kiếm Lake, the Old Quarter, colonial rooftops, and a lantern evening.
+Dense voxel-style miniature of Hà Nội around Hồ Hoàn Kiếm — packed Old Quarter tube houses, asphalt roads, tangled power lines, Tháp Rùa / Ngọc Sơn / Cầu Thê Húc.
+
+Inspired by Tokyo miniature voxel dioramas; sibling of [Đà Nẵng · Diorama 3D](https://danang-diorama.netlify.app/).
 
 ## Run locally
 
