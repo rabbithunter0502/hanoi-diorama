@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>Hà Nội · Diorama 3D</title>
+<meta name="description" content="Hà Nội thu nhỏ trong một hòn đảo 3D vẽ tay: Hồ Hoàn Kiếm, phố cổ, mái ngói thuộc địa, đèn lồng và pháo hoa. Chạy ngay trên trình duyệt.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Hà Nội · Diorama 3D">
+<meta property="og:description" content="Hà Nội thu nhỏ trong một hòn đảo 3D vẽ tay: Hồ Hoàn Kiếm, phố cổ, mái ngói thuộc địa, đèn lồng và pháo hoa. Chạy ngay trên trình duyệt.">
+<meta property="og:image" content="preview.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+:root {
+  --wall: #12162e;
+  --ink: #f0e6d4;
+  --muted: #9a8fb8;
+  --glow: #ffd4a0;
+  --line: rgba(255, 212, 160, 0.38);
+  --accent: #c45c48;
+  --ui: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--wall); color: var(--ink); font-family: var(--ui); overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#c { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#c:active { cursor: grabbing; }
+.brand {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 0;
+  pointer-events: none; z-index: 2;
+  text-shadow: 0 2px 18px rgba(18, 22, 46, 0.65);
+}
+.brand h1 {
+  margin: 0; font: 600 clamp(22px, 4.2vw, 34px)/1.1 var(--ui);
+  letter-spacing: 0.02em; color: var(--glow);
+}
+.brand p {
+  margin: 6px 0 0; font: 500 12px/1.35 var(--ui);
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+}
+.strip {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(18, 22, 46, 0.78), rgba(18, 22, 46, 0));
+  pointer-events: none; z-index: 2;
+}
+.strip > * { pointer-events: auto; }
+button {
+  font: 600 12px/1 var(--ui); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--glow); background: rgba(18, 22, 46, 0.45); border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer;
+}
+button:hover { background: rgba(255, 212, 160, 0.12); }
+button:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+button[aria-pressed="true"] { background: rgba(255, 212, 160, 0.2); }
+@media (max-width: 640px) {
+  .brand h1 { font-size: 22px; }
+  .brand p { font-size: 10px; }
+  .strip { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; gap: 6px; padding-block: 8px calc(10px + env(safe-area-inset-bottom, 0px)); pointer-events: auto; scrollbar-width: none; }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip > button { flex: 0 0 auto; padding: 8px 12px; font-size: 11px; }
+}
+.loading[hidden] { display: none; }
+.loading { position: fixed; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; pointer-events: none; text-align: center; padding: 24px; z-index: 3; }
+</style>
+<div id="stage"><canvas id="c" aria-label="A 3D hand-drawn dusk diorama of Hà Nội: Hoàn Kiếm Lake, the Old Quarter, colonial rooftops and warm lantern light"></canvas></div>
+<div class="loading" id="loading">đang dựng phố…</div>
+<header class="brand">
+  <h1>Hà Nội</h1>
+  <p>Diorama 3D · Hồ Hoàn Kiếm</p>
+</header>
+<div class="strip">
+  <button id="overview" type="button">Overview</button>
+  <button id="view" type="button">Lake view</button>
+  <button id="orbit" type="button" aria-pressed="true">Auto-orbit</button>
+  <button id="follow" type="button" aria-pressed="false">Follow a scooter</button>
+  <button id="night" type="button" aria-pressed="false">Night</button>
+  <button id="fwview" type="button">Fireworks</button>
+  <button id="lantern" type="button" aria-pressed="false">Lantern show</button>
+  <button id="weather" type="button" aria-pressed="false">Clear sky</button>
+  <button id="sound" type="button" aria-pressed="false">Sound off</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(function () {
+'use strict';
+const loadingEl = document.getElementById('loading');
+if (!window.THREE || !THREE.OrbitControls) {
+  loadingEl.textContent = 'The 3D library could not load. Check the connection and reload the page.';
+  return;
+}
+
+const TAU = Math.PI * 2;
+let _s = 0x51a0f1e5;
+const R = () => { _s |= 0; _s = _s + 0x6D2B79F5 | 0; let t = Math.imul(_s ^ _s >>> 15, 1 | _s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const rnd = (a, b) => b === undefined ? R() * a : a + R() * (b - a);
+const pick = (a) => a[Math.floor(R() * a.length)];
+const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const N = (() => {
+  const p = new Uint8Array(512), perm = []; for (let i = 0; i < 256; i++) perm.push(i);
+  for (let i = 255; i > 0; i--) { const j = Math.floor(R() * (i + 1)); const t = perm[i]; perm[i] = perm[j]; perm[j] = t; }
+  for (let i = 0; i < 512; i++) p[i] = perm[i & 255];
+  const grad = (h, x, y) => { switch (h & 7) { case 0: return x + y; case 1: return -x + y; case 2: return x - y; case 3: return -x - y; case 4: return x; case 5: return -x; case 6: return y; default: return -y; } };
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  const n2 = (x, y) => { let X = Math.floor(x), Y = Math.floor(y); x -= X; y -= Y; X &= 255; Y &= 255; const u = fade(x), v = fade(y), a = p[X] + Y, b = p[X + 1] + Y; return lerp(lerp(grad(p[a], x, y), grad(p[b], x - 1, y), u), lerp(grad(p[a + 1], x, y - 1), grad(p[b + 1], x - 1, y - 1), u), v); };
+  const fbm = (x, y, o = 4) => { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { s += a * n2(x * f, y * f); f *= 2.03; a *= 0.5; } return s; };
+  return { n2, fbm };
+})();
+const col = (h) => new THREE.Color(h);
+const dirAzEl = (az, el) => new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+const DEG = Math.PI / 180;
+const v3 = (h) => { const c = new THREE.Color(h); return `vec3(${c.r.toFixed(4)},${c.g.toFixed(4)},${c.b.toFixed(4)})`; };
+function rampGLSL(name, stops) {
+  let s = `vec3 ${name}(float t){ t = clamp(t, 0.0, 1.0);\n`;
+  for (let i = 1; i < stops.length; i++) {
+    const [a, ca] = stops[i - 1], [b, cb] = stops[i];
+    s += `  ${i > 1 ? 'else ' : ''}if (t <= ${b.toFixed(4)}) return mix(${v3(ca)}, ${v3(cb)}, (t - ${a.toFixed(4)}) / ${(b - a).toFixed(4)});\n`;
+  }
+  return s + `  return ${v3(stops[stops.length - 1][1])};\n}\n`;
+}
+function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; }
+
+// ---------------------------------------------------------------- Hanoi geography
+const SUN = dirAzEl(-42 * DEG, 4 * DEG);
+const MOON = dirAzEl(-35 * DEG, 28 * DEG);
+const RM = 420;
+const inDisc = (x, z, m = 0) => x * x + z * z < (RM - m) * (RM - m);
+const WATER_Y = 0.2;
+
+// Hoàn Kiếm Lake — elongated oval slightly north of center
+const LK = { cx: 8, cz: -18, rx: 78, rz: 105 };
+const lakeD = (x, z) => 1 - Math.hypot((x - LK.cx) / LK.rx, (z - LK.cz) / LK.rz);
+const inLake = (x, z) => lakeD(x, z) > 0;
+
+// Ngọc Sơn island (north of lake)
+const NG = { cx: 6, cz: -78, rx: 22, rz: 16 };
+const inNgoc = (x, z) => Math.hypot((x - NG.cx) / NG.rx, (z - NG.cz) / NG.rz) < 1;
+
+// West Lake lobe (west edge of island)
+const WL = { cx: -250, cz: -40, rx: 130, rz: 160 };
+const westLakeD = (x, z) => 1 - Math.hypot((x - WL.cx) / WL.rx, (z - WL.cz) / WL.rz);
+
+// Red River — eastern corridor
+const riverX = (z) => 265 + 18 * Math.sin(z * 0.012) + 8 * N.n2(z * 0.02, 2.2);
+const riverW = () => 55;
+const inRiver = (x, z) => Math.abs(x - riverX(z)) < riverW() / 2;
+
+function landF(x, z) {
+  const edge = (RM - Math.hypot(x, z)) / 40;
+  const hk = lakeD(x, z);
+  const wl = westLakeD(x, z);
+  const rr = (Math.abs(x - riverX(z)) - riverW() / 2) / 18;
+  let f = Math.min(edge, rr);
+  if (hk > 0 && !inNgoc(x, z)) f = Math.min(f, -hk);
+  if (wl > 0.15) f = Math.min(f, -wl + 0.15);
+  return f + N.fbm(x * 0.014, z * 0.014, 3) * 0.12;
+}
+
+function H(x, z) {
+  const lf = landF(x, z);
+  if (inLake(x, z) && !inNgoc(x, z)) return WATER_Y - 1.4;
+  if (westLakeD(x, z) > 0.12) return WATER_Y - 1.2;
+  if (inRiver(x, z)) return WATER_Y - 1.5;
+  if (lf < -0.2) return -4;
+  let h = 1.4 + N.fbm(x * 0.015, z * 0.015, 3) * 1.1;
+  // slight rise toward Ba Đình / west of Old Quarter
+  h += 4 * Math.exp(-(((x + 40) / 90) ** 2 + ((z + 160) / 70) ** 2));
+  if (inNgoc(x, z)) h = Math.max(h, 2.2);
+  if (lf < 0.1) h = lerp(-4, h, sstep(-0.2, 0.1, lf));
+  return h;
+}
+
+// ---------------------------------------------------------------- renderer
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+const LOW_POWER = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches && navigator.maxTouchPoints > 0);
+const DPR = Math.min(window.devicePixelRatio || 1, LOW_POWER ? 1.25 : 1.75);
+renderer.setPixelRatio(DPR);
+const scene = new THREE.Scene();
+const FOG = col('#d4a8b0'), FOG_NEAR = 900, FOG_FAR = 3800;
+scene.fog = new THREE.Fog(FOG, FOG_NEAR, FOG_FAR);
+const camera = new THREE.PerspectiveCamera(45, 1, 1, 8000);
+const VIEWS = {
+  overview: { pos: new THREE.Vector3(480, 420, 620), target: new THREE.Vector3(0, 8, -20) },
+  painting: { pos: new THREE.Vector3(145, 28, 95), target: new THREE.Vector3(10, 6, -40) },
+};
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+camera.position.copy(VIEWS.overview.pos);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.copy(VIEWS.overview.target); controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 18; controls.maxDistance = 1800; controls.maxPolarAngle = Math.PI * 0.62; controls.autoRotateSpeed = 0.4;
+controls.autoRotate = !reduceMotion;
+controls.update();
+const uTime = { value: 0 }, uNight = { value: 0 }, uWet = { value: 0 };
+
+const grad = (() => { const d = new Uint8Array([86, 86, 86, 255, 160, 160, 160, 255, 235, 235, 235, 255]); const t = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toon = (c, extra) => new THREE.MeshToonMaterial(Object.assign({ color: c, gradientMap: grad }, extra || {}));
+const hemiLight = new THREE.HemisphereLight(0x8a7ec8, 0x3a2848, 0.95); scene.add(hemiLight);
+const sunLight = new THREE.DirectionalLight(0xffb487, 1.25); sunLight.position.set(-500, 180, -220); scene.add(sunLight);
+const fillLight = new THREE.DirectionalLight(0x7a72c0, 0.28); fillLight.position.set(280, 200, 360); scene.add(fillLight);
+const dummy = new THREE.Object3D();
+
+// ---------------------------------------------------------------- sky
+const SKY_STOPS = [[0, '#141a4a'], [0.12, '#243068'], [0.28, '#3a5898'], [0.42, '#6a88c0'], [0.55, '#a898c8'], [0.68, '#d898a8'], [0.8, '#f0a888'], [0.9, '#ffc898'], [1, '#ffe8b8']];
+const SKY_GLSL = rampGLSL('skyRamp', SKY_STOPS) + `
+uniform float uNight; uniform float uWet;
+vec3 skyColor(vec3 d, vec3 sd) {
+  d = normalize(d);
+  float y = max(d.y, 0.0);
+  float t = 1.0 - clamp(y / 0.55, 0.0, 1.0);
+  vec3 c = skyRamp(t);
+  float s = max(dot(d, sd), 0.0);
+  c = mix(c, vec3(1.0, 0.86, 0.63), pow(s, 5.0) * 0.5 * smoothstep(0.25, 0.95, t));
+  vec3 nc = mix(vec3(0.012, 0.016, 0.055), vec3(0.05, 0.06, 0.16), t * t) + vec3(0.28, 0.12, 0.14) * pow(t, 8.0) * 0.5;
+  c = mix(c, nc, uNight);
+  c = mix(c, mix(vec3(0.55, 0.54, 0.62), vec3(0.05, 0.055, 0.09), uNight) * (0.9 + 0.1 * t), uWet);
+  return c;
+}`;
+const skyGroup = new THREE.Group(); scene.add(skyGroup);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { sunDir: { value: SUN }, uTime, uNight, uWet },
+  vertexShader: `varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: SKY_GLSL + `
+    uniform vec3 sunDir; varying vec3 vD;
+    void main(){
+      vec3 d = normalize(vD);
+      vec3 c = skyColor(vec3(d.x, max(d.y, 0.0), d.z), sunDir);
+      if (d.y < 0.0) { c = mix(c, vec3(0.7, 0.5, 0.58), clamp(-d.y * 5.0, 0.0, 1.0)); c = mix(c, vec3(0.14, 0.12, 0.28), smoothstep(0.08, 0.75, -d.y)); }
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+skyGroup.add(new THREE.Mesh(new THREE.SphereGeometry(3600, 48, 24), skyMat));
+
+const glowTex = canvasTex(64, 64, (g) => {
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,0.4)'); r.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+});
+const glowSprite = (color, size, opacity = 1) => {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity, fog: false }));
+  s.scale.set(size, size, 1); return s;
+};
+const sun = glowSprite(0xffd8a8, 220, 1); sun.position.copy(SUN).multiplyScalar(3000); skyGroup.add(sun);
+const moon = glowSprite(0xdde6ff, 90, 0); moon.position.copy(MOON).multiplyScalar(2800); skyGroup.add(moon);
+
+// stars
+{
+  const n = 900, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = R() * TAU, e = (0.05 + R() * 0.7) * Math.PI / 2;
+    const d = dirAzEl(a, e); pos.set([d.x * 3200, d.y * 3200, d.z * 3200], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff6e0, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  skyGroup.add(stars); window.__stars = stars;
+}
+
+// clouds
+const puffTex = canvasTex(128, 128, (g) => {
+  for (let k = 0; k < 7; k++) {
+    const x = 30 + R() * 68, y = 40 + R() * 48, r = 18 + R() * 28;
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, 'rgba(255,255,255,0.7)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, 128, 128);
+  }
+});
+const clouds = [];
+{
+  const CLOUD_COLS = ['#f0b8c0', '#ffd0b0', '#e0c0d8', '#fff0d8'].map(col);
+  for (let i = 0; i < 28; i++) {
+    const a = rnd(TAU), r = rnd(900, 2200), el = rnd(0.08, 0.35);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, color: pick(CLOUD_COLS), transparent: true, depthWrite: false, opacity: rnd(0.45, 0.85), fog: false }));
+    s.scale.set(rnd(180, 420), rnd(70, 160), 1);
+    const p = dirAzEl(a, el).multiplyScalar(r); s.position.copy(p);
+    skyGroup.add(s); clouds.push({ s, a, r, el, ph: rnd(TAU), sp: rnd(0.01, 0.03) });
+  }
+}
+function updateClouds(t) {
+  for (const c of clouds) {
+    const a = c.a + t * c.sp;
+    c.s.position.copy(dirAzEl(a, c.el + Math.sin(t * 0.1 + c.ph) * 0.02).multiplyScalar(c.r));
+    c.s.material.opacity = (0.35 + 0.4 * (1 - uNight.value)) * (1 - 0.7 * uWet.value);
+  }
+}
+
+// ---------------------------------------------------------------- terrain disc
+const RES = LOW_POWER ? 140 : 200;
+const terrainGeo = new THREE.PlaneGeometry(RM * 2.05, RM * 2.05, RES, RES);
+terrainGeo.rotateX(-Math.PI / 2);
+{
+  const pos = terrainGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    if (!inDisc(x, z, -8)) { pos.setY(i, -8); continue; }
+    pos.setY(i, H(x, z));
+  }
+  terrainGeo.computeVertexNormals();
+}
+const terrainMat = new THREE.ShaderMaterial({
+  lights: false, fog: true,
+  uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+    sunDir: { value: SUN }, uNight, uWet,
+    uFog: { value: FOG }, uFogNear: { value: FOG_NEAR }, uFogFar: { value: FOG_FAR },
+  }]),
+  vertexShader: `
+    varying vec3 vW; varying vec3 vN;
+    void main(){
+      vec4 w = modelMatrix * vec4(position, 1.0);
+      vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal);
+      gl_Position = projectionMatrix * viewMatrix * w;
+    }`,
+  fragmentShader: `
+    uniform vec3 sunDir; uniform float uNight; uniform float uWet;
+    uniform vec3 uFog; uniform float uFogNear; uniform float uFogFar;
+    varying vec3 vW; varying vec3 vN;
+    void main(){
+      float ndl = clamp(dot(normalize(vN), normalize(sunDir)), 0.0, 1.0);
+      vec3 grass = mix(vec3(0.28, 0.42, 0.28), vec3(0.18, 0.28, 0.2), uNight);
+      vec3 soil = mix(vec3(0.42, 0.34, 0.28), vec3(0.16, 0.14, 0.16), uNight);
+      float h = vW.y;
+      vec3 base = mix(soil, grass, smoothstep(0.5, 2.2, h));
+      base *= 0.55 + 0.55 * ndl * (1.0 - 0.55 * uNight);
+      float dist = length(vW - cameraPosition);
+      float fogF = smoothstep(uFogNear, uFogFar, dist);
+      vec3 c = mix(base, uFog, fogF);
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+const terrain = new THREE.Mesh(terrainGeo, terrainMat); scene.add(terrain);
+
+// water planes: Hoàn Kiếm + West Lake + Red River strip
+function makeWater(cx, cz, rx, rz, rot = 0) {
+  const g = new THREE.CircleGeometry(1, 64);
+  g.scale(rx, rz, 1); g.rotateX(-Math.PI / 2);
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uTime, uNight, uWet, sunDir: { value: SUN } },
+    vertexShader: `varying vec3 vW; varying vec2 vUv; void main(){ vUv=uv; vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `
+      uniform float uTime; uniform float uNight; uniform float uWet; uniform vec3 sunDir;
+      varying vec3 vW; varying vec2 vUv;
+      void main(){
+        vec2 p = vUv - 0.5;
+        float r = length(p) * 2.0;
+        float wave = sin((p.x * 28.0 + p.y * 18.0) + uTime * 1.2) * 0.5 + 0.5;
+        vec3 deep = mix(vec3(0.12, 0.38, 0.4), vec3(0.03, 0.08, 0.12), uNight);
+        vec3 shallow = mix(vec3(0.28, 0.58, 0.55), vec3(0.06, 0.14, 0.18), uNight);
+        vec3 c = mix(shallow, deep, smoothstep(0.2, 0.95, r));
+        c += vec3(0.35, 0.4, 0.35) * wave * 0.08 * (1.0 - uNight);
+        // sky reflection streak toward sun
+        float gl = pow(max(dot(normalize(vec3(p.x, 0.4, p.y)), normalize(sunDir.xzx)), 0.0), 18.0);
+        c += mix(vec3(1.0, 0.9, 0.7), vec3(0.5, 0.55, 0.7), uNight) * gl * 0.35;
+        float a = smoothstep(1.02, 0.92, r) * 0.92;
+        gl_FragColor = vec4(c, a);
+      }`,
+  });
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.set(cx, WATER_Y, cz);
+  mesh.rotation.y = rot;
+  scene.add(mesh);
+  return mesh;
+}
+const hkWater = makeWater(LK.cx, LK.cz, LK.rx, LK.rz);
+const wlWater = makeWater(WL.cx, WL.cz, WL.rx * 0.92, WL.rz * 0.92);
+{
+  // Red River ribbon
+  const pts = [];
+  for (let z = -RM; z <= RM; z += 8) pts.push(new THREE.Vector3(riverX(z), WATER_Y, z));
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const tube = new THREE.TubeGeometry(curve, 80, riverW() / 2, 8, false);
+  // flatten top — use a plane strip instead for better look
+  tube.dispose();
+  const rw = riverW(), segs = 60;
+  const geo = new THREE.PlaneGeometry(rw, RM * 2, 1, segs);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const z = pos.getZ(i);
+    const xOff = pos.getX(i);
+    pos.setX(i, riverX(z) + xOff);
+    pos.setY(i, WATER_Y);
+  }
+  geo.computeVertexNormals();
+  const mat = hkWater.material.clone();
+  const river = new THREE.Mesh(geo, mat);
+  scene.add(river);
+}
+
+// island rim ring
+{
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(RM - 6, 7, 8, 96),
+    toon(col('#3a4a38'))
+  );
+  rim.rotation.x = Math.PI / 2; rim.position.y = 0.5; scene.add(rim);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(RM + 8, RM + 18, 22, 64, 1, true), toon(col('#2a2438')));
+  base.position.y = -10; scene.add(base);
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(RM + 18, 64), toon(col('#1a1628')));
+  bottom.rotation.x = Math.PI / 2; bottom.position.y = -21; scene.add(bottom);
+}
+
+// ---------------------------------------------------------------- roads around Hoàn Kiếm + Old Quarter grid
+const roadMat = toon(col('#4a4660'));
+const roadPaths = [];
+function addRingRoad(cx, cz, rx, rz, w = 7) {
+  const pts = [];
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * TAU;
+    pts.push([cx + Math.cos(a) * (rx + 14), cz + Math.sin(a) * (rz + 14)]);
+  }
+  roadPaths.push({ pts, w });
+}
+addRingRoad(LK.cx, LK.cz, LK.rx, LK.rz, 8);
+
+// Old Quarter streets (north of lake)
+const OQ = { x0: -95, x1: 110, z0: -210, z1: -95 };
+for (let x = OQ.x0; x <= OQ.x1; x += 22) {
+  const pts = []; for (let z = OQ.z0; z <= OQ.z1; z += 4) pts.push([x + N.n2(x * 0.1, z * 0.05) * 1.2, z]);
+  roadPaths.push({ pts, w: 5.5 });
+}
+for (let z = OQ.z0; z <= OQ.z1; z += 18) {
+  const pts = []; for (let x = OQ.x0; x <= OQ.x1; x += 4) pts.push([x, z + N.n2(x * 0.05, z * 0.1) * 1.0]);
+  roadPaths.push({ pts, w: 5.5 });
+}
+// French quarter avenues south-east of lake
+for (let z = 40; z < 200; z += 28) {
+  const pts = []; for (let x = -40; x < 200; x += 4) {
+    if (inLake(x, z) || inRiver(x, z)) continue;
+    pts.push([x, z]);
+  }
+  if (pts.length > 3) roadPaths.push({ pts, w: 7 });
+}
+for (let x = -20; x < 220; x += 32) {
+  const pts = []; for (let z = 30; z < 210; z += 4) {
+    if (inLake(x, z) || inRiver(x, z)) continue;
+    pts.push([x, z]);
+  }
+  if (pts.length > 3) roadPaths.push({ pts, w: 6.5 });
+}
+// Tràng Tiền toward river
+{
+  const pts = [];
+  for (let x = 40; x < 250; x += 3) pts.push([x, 55 + Math.sin(x * 0.02) * 3]);
+  roadPaths.push({ pts, w: 8 });
+}
+
+function buildRoadRibbon(pts, width) {
+  if (pts.length < 2) return null;
+  const half = width / 2;
+  const pos = [], nor = [], idx = [];
+  for (let i = 0; i < pts.length; i++) {
+    const [x, z] = pts[i];
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(pts.length - 1, i + 1)];
+    let dx = p1[0] - p0[0], dz = p1[1] - p0[1], L = Math.hypot(dx, dz) || 1;
+    dx /= L; dz /= L;
+    const nx = -dz, nz = dx;
+    const y = Math.max(H(x, z), WATER_Y) + 0.28;
+    pos.push(x + nx * half, y, z + nz * half, x - nx * half, y, z - nz * half);
+    nor.push(0, 1, 0, 0, 1, 0);
+    if (i > 0) {
+      const a = (i - 1) * 2, b = i * 2;
+      idx.push(a, a + 1, b, a + 1, b + 1, b);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return new THREE.Mesh(g, roadMat);
+}
+const LAMP_POS = [];
+roadPaths.forEach((rp, ri) => {
+  const mesh = buildRoadRibbon(rp.pts, rp.w);
+  if (mesh) scene.add(mesh);
+  // lamps every so often
+  for (let i = 0; i < rp.pts.length; i += 7) {
+    const [x, z] = rp.pts[i];
+    if (!inDisc(x, z, 20) || inLake(x, z) || inRiver(x, z)) continue;
+    const y = H(x, z);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 4.2, 5), toon(col('#2a2a48')));
+    post.position.set(x + rp.w * 0.45, y + 2.1, z); scene.add(post);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), new THREE.MeshBasicMaterial({ color: col('#fff2d0') }));
+    head.position.set(x + rp.w * 0.45, y + 4.3, z); scene.add(head);
+    const gl = glowSprite(0xffe0a8, 6, 0); gl.position.copy(head.position); scene.add(gl);
+    LAMP_POS.push({ head, gl, x, y: y + 4.3, z });
+  }
+});
+
+// route sampler for scooters
+function routeLen(pts) {
+  let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  return L;
+}
+function routeAt(pts, d) {
+  let left = ((d % routeLen(pts)) + routeLen(pts)) % routeLen(pts);
+  for (let i = 1; i < pts.length; i++) {
+    const seg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (left <= seg) {
+      const t = left / (seg || 1);
+      const x = lerp(pts[i - 1][0], pts[i][0], t), z = lerp(pts[i - 1][1], pts[i][1], t);
+      const y = Math.max(H(x, z), WATER_Y) + 0.45;
+      const dx = pts[i][0] - pts[i - 1][0], dz = pts[i][1] - pts[i - 1][1];
+      return { x, y, z, yaw: -Math.atan2(dz, dx) + Math.PI / 2 };
+    }
+    left -= seg;
+  }
+  const p = pts[pts.length - 1];
+  return { x: p[0], y: H(p[0], p[1]) + 0.45, z: p[1], yaw: 0 };
+}
+
+// ---------------------------------------------------------------- buildings: Old Quarter tube houses + colonial blocks
+const WALL_COLS = ['#e8c878', '#d4a85a', '#c89050', '#e0b070', '#f0d090', '#b87848', '#d8c0a0', '#c4a878'].map(col);
+const ROOF_COLS = ['#8a3a32', '#a44838', '#6e3028', '#9a5040', '#7a3830'].map(col);
+const OQ_WALL = ['#e8d8b8', '#f0e0c0', '#d8c8a8', '#c85848', '#4a6a8a', '#e8c060', '#d0b090', '#f4e8d0'].map(col);
+const houses = [];
+const winMats = [];
+
+function addBuilding(x, z, w, d, floors, wallCol, roofCol, tube = false) {
+  if (!inDisc(x, z, 25) || inLake(x, z) || inRiver(x, z) || westLakeD(x, z) > 0.05) return null;
+  if (Math.hypot((x - LK.cx) / (LK.rx + 18), (z - LK.cz) / (LK.rz + 18)) < 1) return null;
+  const y0 = H(x, z);
+  const fh = tube ? rnd(3.2, 3.8) : rnd(3.4, 4.2);
+  const h = floors * fh;
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(wallCol));
+  body.position.y = h / 2; g.add(body);
+  // windows
+  const winM = new THREE.MeshBasicMaterial({ color: col('#1a1830') });
+  winMats.push(winM);
+  for (let f = 0; f < floors; f++) {
+    for (let s = -1; s <= 1; s += 2) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(tube ? w * 0.55 : w * 0.28, fh * 0.45, 0.15), winM);
+      win.position.set(tube ? 0 : s * w * 0.22, fh * (f + 0.55), d / 2 + 0.05);
+      g.add(win);
+      const glow = glowSprite(0xffd090, tube ? 2.2 : 1.6, 0);
+      glow.position.copy(win.position); glow.position.z += 0.4; g.add(glow);
+      glow.userData.winGlow = true;
+    }
+  }
+  // pitched roof
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.max(w, d) * 0.72, 2.2, 4), toon(roofCol));
+  roof.rotation.y = Math.PI / 4; roof.position.y = h + 1.0; g.add(roof);
+  // balcony stripe for colonial
+  if (!tube && floors >= 2) {
+    const bal = new THREE.Mesh(new THREE.BoxGeometry(w * 0.95, 0.2, 0.5), toon(col('#f4efe4')));
+    bal.position.set(0, fh * 1.05, d / 2 + 0.15); g.add(bal);
+  }
+  g.position.set(x, y0, z);
+  g.rotation.y = rnd(-0.08, 0.08);
+  scene.add(g);
+  const b = { x, z, y: y0, w, d, h, g };
+  houses.push(b);
+  return b;
+}
+
+// Old Quarter dense tube houses
+for (let x = OQ.x0 + 6; x < OQ.x1 - 6; x += 7.5) {
+  for (let z = OQ.z0 + 6; z < OQ.z1 - 6; z += 6.5) {
+    // skip roads (near integer grid lines)
+    let nearRoad = false;
+    for (let gx = OQ.x0; gx <= OQ.x1; gx += 22) if (Math.abs(x - gx) < 4) nearRoad = true;
+    for (let gz = OQ.z0; gz <= OQ.z1; gz += 18) if (Math.abs(z - gz) < 3.5) nearRoad = true;
+    if (nearRoad || R() < 0.12) continue;
+    const w = rnd(4.2, 5.8), d = rnd(8, 12), fl = 2 + Math.floor(R() * 3);
+    addBuilding(x + rnd(-0.6, 0.6), z + rnd(-0.4, 0.4), w, d, fl, pick(OQ_WALL), pick(ROOF_COLS), true);
+  }
+}
+// colonial / French quarter south-east
+for (let i = 0; i < 90; i++) {
+  const x = rnd(-30, 200), z = rnd(70, 220);
+  if (Math.hypot((x - LK.cx) / (LK.rx + 25), (z - LK.cz) / (LK.rz + 25)) < 1) continue;
+  addBuilding(x, z, rnd(8, 14), rnd(8, 14), 2 + Math.floor(R() * 3), pick(WALL_COLS), pick(ROOF_COLS), false);
+}
+// west of lake denser mid-rise
+for (let i = 0; i < 70; i++) {
+  const x = rnd(-180, -50), z = rnd(-120, 80);
+  if (westLakeD(x, z) > 0) continue;
+  addBuilding(x, z, rnd(6, 11), rnd(7, 12), 2 + Math.floor(R() * 4), pick(WALL_COLS), pick(ROOF_COLS), false);
+}
+
+// trees around lake
+const TREE_POS = [];
+{
+  const trunkM = toon(col('#5a4030')), leafM = toon(col('#3a7a48'));
+  for (let i = 0; i < 160; i++) {
+    const a = rnd(TAU);
+    const rx = LK.rx + 18 + rnd(0, 22), rz = LK.rz + 18 + rnd(0, 22);
+    const x = LK.cx + Math.cos(a) * rx, z = LK.cz + Math.sin(a) * rz;
+    if (!inDisc(x, z, 20) || inLake(x, z) || inRiver(x, z)) continue;
+    const y = H(x, z), s = rnd(0.85, 1.35);
+    const g = new THREE.Group();
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 3.2, 5), trunkM);
+    tr.position.y = 1.6; g.add(tr);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(2.2, 8, 6), leafM);
+    leaf.position.y = 4.2; leaf.scale.set(1, 0.85, 1); g.add(leaf);
+    g.position.set(x, y, z); g.scale.setScalar(s); scene.add(g);
+    TREE_POS.push([x, z]);
+  }
+}
+
+// ---------------------------------------------------------------- landmarks
+// Turtle Tower (Tháp Rùa) — center-south of lake
+const turtleTower = new THREE.Group();
+{
+  const stone = toon(col('#5a5048'));
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8, 2.2, 8), stone); base.position.y = 1.1; turtleTower.add(base);
+  const mid = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.5, 5.5), stone); mid.position.y = 4.4; turtleTower.add(mid);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3.2, 3.5), stone); top.position.y = 8.2; turtleTower.add(top);
+  const roof1 = new THREE.Mesh(new THREE.ConeGeometry(5.2, 2.4, 4), toon(col('#8a3030'))); roof1.rotation.y = Math.PI / 4; roof1.position.y = 6.8; turtleTower.add(roof1);
+  const roof2 = new THREE.Mesh(new THREE.ConeGeometry(3.4, 2.8, 4), toon(col('#a03830'))); roof2.rotation.y = Math.PI / 4; roof2.position.y = 10.5; turtleTower.add(roof2);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), new THREE.MeshBasicMaterial({ color: col('#e8c860') })); tip.position.y = 12.1; turtleTower.add(tip);
+  const gl = glowSprite(0xffd070, 8, 0); gl.position.y = 12.1; turtleTower.add(gl);
+  turtleTower.userData.glow = gl;
+}
+turtleTower.position.set(LK.cx - 6, WATER_Y, LK.cz + 28); scene.add(turtleTower);
+
+// Ngọc Sơn temple
+const ngocSon = new THREE.Group();
+{
+  const cream = toon(col('#f0e8d0')), red = toon(col('#a03028')), green = toon(col('#2a6040'));
+  const plat = new THREE.Mesh(new THREE.BoxGeometry(28, 1.2, 22), toon(col('#6a6058'))); plat.position.y = 0.6; ngocSon.add(plat);
+  const hall = new THREE.Mesh(new THREE.BoxGeometry(14, 5, 10), cream); hall.position.y = 3.6; ngocSon.add(hall);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(11, 3.5, 4), red); roof.rotation.y = Math.PI / 4; roof.position.y = 7.5; ngocSon.add(roof);
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(6, 7, 2), cream); gate.position.set(0, 4.5, 8); ngocSon.add(gate);
+  const gateRoof = new THREE.Mesh(new THREE.ConeGeometry(5, 2.2, 4), red); gateRoof.rotation.y = Math.PI / 4; gateRoof.position.set(0, 9, 8); ngocSon.add(gateRoof);
+  // trees on island
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * TAU, x = Math.cos(a) * 10, z = Math.sin(a) * 7;
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(2.4, 7, 5), green); leaf.position.set(x, 4, z); ngocSon.add(leaf);
+  }
+}
+ngocSon.position.set(NG.cx, H(NG.cx, NG.cz), NG.cz); scene.add(ngocSon);
+
+// The Húc Bridge — red arched bridge from east shore to Ngọc Sơn
+const hucBridge = new THREE.Group();
+{
+  const red = toon(col('#c03830'));
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(42, 1.2, -55),
+    new THREE.Vector3(28, 3.8, -62),
+    new THREE.Vector3(16, 4.2, -70),
+    new THREE.Vector3(8, 2.4, -76),
+  ]);
+  const deck = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 1.1, 6, false), red);
+  hucBridge.add(deck);
+  // rail posts
+  for (let i = 0; i <= 12; i++) {
+    const p = curve.getPoint(i / 12);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.6, 0.25), red);
+    post.position.set(p.x, p.y + 1.0, p.z); hucBridge.add(post);
+  }
+  // lanterns on bridge
+  for (let i = 1; i < 12; i += 2) {
+    const p = curve.getPoint(i / 12);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), new THREE.MeshBasicMaterial({ color: col('#ffd080') }));
+    lamp.position.set(p.x, p.y + 1.8, p.z); hucBridge.add(lamp);
+    const gl = glowSprite(0xffc060, 3.5, 0); gl.position.copy(lamp.position); hucBridge.add(gl);
+    gl.userData.bridgeLantern = true;
+  }
+}
+scene.add(hucBridge);
+
+// Flag Tower of Hanoi (Cột Cờ) — southwest of lake / Ba Đình direction
+const flagTower = new THREE.Group();
+{
+  const brick = toon(col('#a85840'));
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(8, 10, 6, 8), brick); base.position.y = 3; flagTower.add(base);
+  const mid = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 6, 10, 8), brick); mid.position.y = 11; flagTower.add(mid);
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3.5, 14, 8), brick); top.position.y = 23; flagTower.add(top);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 12, 6), toon(col('#d8d0c0'))); pole.position.y = 36; flagTower.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), new THREE.MeshBasicMaterial({ color: col('#da251d'), side: THREE.DoubleSide }));
+  flag.position.set(3.2, 38, 0); flagTower.add(flag);
+  flagTower.userData.flag = flag;
+}
+flagTower.position.set(-70, H(-70, -175), -175); scene.add(flagTower);
+
+// Opera House — yellow colonial south-east
+const opera = new THREE.Group();
+{
+  const yel = toon(col('#f0d878'));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(28, 10, 18), yel); body.position.y = 5; opera.add(body);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(10, 8, 14), yel); wingL.position.set(-16, 4, 0); opera.add(wingL);
+  const wingR = wingL.clone(); wingR.position.x = 16; opera.add(wingR);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(5, 12, 8), toon(col('#e8c860'))); dome.position.y = 13; opera.add(dome);
+  const cols = toon(col('#f8f0d8'));
+  for (let i = -3; i <= 3; i++) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 8, 8), cols);
+    c.position.set(i * 3.2, 4, 9.5); opera.add(c);
+  }
+}
+opera.position.set(95, H(95, 120), 120); scene.add(opera);
+
+// ---------------------------------------------------------------- scooters / cars
+const scooters = [];
+const SCOOT_COLS = ['#e8533f', '#2f6fc8', '#f2c14e', '#1c1b2c', '#f08aa8', '#3db08a', '#f4f0f4', '#9a5ad0'].map(col);
+const driveRoutes = roadPaths.filter((r) => r.pts.length > 8 && routeLen(r.pts) > 80);
+for (let i = 0; i < Math.min(42, driveRoutes.length * 3); i++) {
+  const route = driveRoutes[i % driveRoutes.length];
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 1.6), toon(pick(SCOOT_COLS)));
+  body.position.y = 0.45; g.add(body);
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.2, 0.5), toon(col('#2a2a38'))); seat.position.set(0, 0.75, -0.15); g.add(seat);
+  const headlight = glowSprite(0xfff0c0, 1.8, 0); headlight.position.set(0, 0.5, 0.9); g.add(headlight);
+  scene.add(g);
+  scooters.push({ g, route: route.pts, d: rnd(routeLen(route.pts)), v: rnd(10, 18), headlight, q: { x: 0, y: 0, z: 0 } });
+}
+function updateTraffic(dt) {
+  for (const s of scooters) {
+    s.d += s.v * dt;
+    const q = routeAt(s.route, s.d);
+    s.q = q;
+    s.g.position.set(q.x, q.y, q.z);
+    s.g.rotation.y = q.yaw;
+  }
+}
+
+// ---------------------------------------------------------------- floating lanterns (for lantern show)
+const lanterns = [];
+{
+  const paperCols = ['#ff7a40', '#ffd060', '#ff5080', '#ffe8a0', '#ff9040'].map(col);
+  for (let i = 0; i < 48; i++) {
+    const g = new THREE.Group();
+    const paper = new THREE.Mesh(new THREE.SphereGeometry(1.1, 10, 8), new THREE.MeshBasicMaterial({ color: pick(paperCols), transparent: true, opacity: 0.85 }));
+    paper.scale.set(1, 1.25, 1); g.add(paper);
+    const gl = glowSprite(0xffb060, 5, 0); g.add(gl);
+    g.visible = false; scene.add(g);
+    lanterns.push({
+      g, gl,
+      a: rnd(TAU), r: rnd(20, LK.rx * 0.85), h: rnd(8, 55),
+      sp: rnd(0.15, 0.4), ph: rnd(TAU),
+    });
+  }
+}
+
+// ---------------------------------------------------------------- fireworks over Hoàn Kiếm
+const FW_N = 4500, fwPos = new Float32Array(FW_N * 3), fwCol = new Float32Array(FW_N * 3), fwA = new Float32Array(FW_N), fwS = new Float32Array(FW_N);
+const sparks = []; for (let i = 0; i < FW_N; i++) sparks.push({ life: 0 });
+let sparkI = 0;
+const fwGeo = new THREE.BufferGeometry();
+fwGeo.setAttribute('position', new THREE.BufferAttribute(fwPos, 3));
+fwGeo.setAttribute('aCol', new THREE.BufferAttribute(fwCol, 3));
+fwGeo.setAttribute('aA', new THREE.BufferAttribute(fwA, 1));
+fwGeo.setAttribute('aS', new THREE.BufferAttribute(fwS, 1));
+const fwPts = new THREE.Points(fwGeo, new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, uniforms: { uDpr: { value: DPR } },
+  vertexShader: `attribute vec3 aCol; attribute float aA; attribute float aS; uniform float uDpr; varying vec3 vC; varying float vA;
+    void main(){ vA=aA; vC=aCol; vec4 mv=modelViewMatrix*vec4(position,1.0); gl_PointSize=aS*uDpr*700.0/-mv.z; gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `varying vec3 vC; varying float vA; void main(){ float r=length(gl_PointCoord-0.5); float a=smoothstep(0.5,0.0,r); gl_FragColor=vec4(vC*(0.6+0.8*a), a*vA); }`,
+}));
+fwPts.frustumCulled = false; scene.add(fwPts);
+const FW_COLS = ['#ff4a5a', '#ffd34a', '#5fd8ff', '#c070ff', '#5dff8a', '#ffffff', '#ff8a2a', '#ff3df0'].map(col);
+const shells = [];
+let nextShell = 0;
+const spark = (x, y, z, vx, vy, vz, life, c, size, drag, grav) => {
+  const s = sparks[sparkI]; sparkI = (sparkI + 1) % FW_N;
+  Object.assign(s, { x, y, z, vx, vy, vz, life, max: life, c, size, drag, grav });
+};
+function burst(x, y, z, c) {
+  const n = 60 + Math.floor(R() * 50);
+  for (let i = 0; i < n; i++) {
+    const a = R() * TAU, e = R() * Math.PI, sp = rnd(8, 22);
+    spark(x, y, z, Math.cos(a) * Math.sin(e) * sp, Math.cos(e) * sp, Math.sin(a) * Math.sin(e) * sp, rnd(0.9, 1.8), c, rnd(1.8, 3.2), 1.4, 12);
+  }
+  // water reflection sparks
+  for (let i = 0; i < 20; i++) {
+    spark(x + rnd(-4, 4), WATER_Y + 0.5, z + rnd(-4, 4), rnd(-2, 2), rnd(0.5, 2), rnd(-2, 2), rnd(0.4, 0.9), c, rnd(1.2, 2.2), 2, 4);
+  }
+  if (soundOn) sfxBoom(x, y, z);
+}
+function updateFireworks(t, dt, on) {
+  if (on && t > nextShell) {
+    nextShell = t + rnd(0.55, 1.4);
+    const a = rnd(TAU), r = rnd(0, 40);
+    const x = LK.cx + Math.cos(a) * r, z = LK.cz + Math.sin(a) * r;
+    shells.push({ x, y: WATER_Y + 1, z, vy: rnd(38, 55), life: 1, c: pick(FW_COLS), age: 0 });
+  }
+  for (let i = shells.length - 1; i >= 0; i--) {
+    const s = shells[i];
+    s.age += dt; s.y += s.vy * dt; s.vy -= 28 * dt;
+    spark(s.x, s.y, s.z, rnd(-1, 1), rnd(-1, 1), rnd(-1, 1), 0.25, col('#ffd8a0'), 1.4, 2, 5);
+    if (s.vy < 4 || s.age > 1.6) { burst(s.x, s.y, s.z, s.c); shells.splice(i, 1); }
+  }
+  for (let i = 0; i < FW_N; i++) {
+    const s = sparks[i];
+    if (s.life <= 0) { fwA[i] = 0; continue; }
+    s.life -= dt;
+    s.vx *= Math.exp(-s.drag * dt); s.vz *= Math.exp(-s.drag * dt); s.vy -= s.grav * dt;
+    s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
+    fwPos.set([s.x, s.y, s.z], i * 3);
+    fwCol.set([s.c.r, s.c.g, s.c.b], i * 3);
+    fwA[i] = clamp(s.life / s.max); fwS[i] = s.size;
+  }
+  fwGeo.attributes.position.needsUpdate = true;
+  fwGeo.attributes.aCol.needsUpdate = true;
+  fwGeo.attributes.aA.needsUpdate = true;
+  fwGeo.attributes.aS.needsUpdate = true;
+}
+
+// ---------------------------------------------------------------- post-process (soft bloom / pixel feel)
+const rt = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat });
+const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const postMat = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uRes; varying vec2 vUv;
+    void main(){
+      vec2 px = 1.0 / uRes;
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec4 b = texture2D(tDiffuse, vUv + px * vec2(1.0,0.0)) + texture2D(tDiffuse, vUv + px * vec2(-1.0,0.0))
+             + texture2D(tDiffuse, vUv + px * vec2(0.0,1.0)) + texture2D(tDiffuse, vUv + px * vec2(0.0,-1.0));
+      b *= 0.25;
+      float lum = max(c.r, max(c.g, c.b));
+      vec3 outc = c.rgb + max(b.rgb - 0.55, 0.0) * 0.55;
+      // subtle vignette
+      float v = smoothstep(1.15, 0.35, length(vUv - 0.5));
+      outc *= 0.88 + 0.12 * v;
+      gl_FragColor = vec4(outc, 1.0);
+    }`,
+});
+const postScene = new THREE.Scene();
+postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMat));
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+  rt.setSize(Math.floor(w * DPR), Math.floor(h * DPR));
+  postMat.uniforms.tDiffuse.value = rt.texture;
+  postMat.uniforms.uRes.value.set(w * DPR, h * DPR);
+}
+window.addEventListener('resize', resize); resize();
+
+// ---------------------------------------------------------------- controls
+let fly = null;
+const flyTo = (v) => { fly = { t: 0, p0: camera.position.clone(), q0: controls.target.clone(), to: v }; };
+const orbitBtn = document.getElementById('orbit'), followBtn = document.getElementById('follow');
+let follow = -1, followYaw = 0, followPitch = 0, followZoom = 1, followDrag = false;
+const stopFollow = () => {
+  follow = -1; controls.minDistance = 18; controls.enabled = true;
+  followBtn.setAttribute('aria-pressed', 'false'); followBtn.textContent = 'Follow a scooter';
+};
+document.getElementById('view').addEventListener('click', () => {
+  stopFollow(); flyTo(VIEWS.painting); controls.autoRotate = false; orbitBtn.setAttribute('aria-pressed', 'false');
+});
+document.getElementById('overview').addEventListener('click', () => { stopFollow(); flyTo(VIEWS.overview); });
+followBtn.addEventListener('click', () => {
+  follow = (follow + 1) % scooters.length;
+  fly = null; followYaw = 0; followPitch = 0; followZoom = 1;
+  controls.minDistance = 1; controls.enabled = false; controls.autoRotate = false;
+  orbitBtn.setAttribute('aria-pressed', 'false');
+  followBtn.setAttribute('aria-pressed', 'true'); followBtn.textContent = 'Around the lake ›';
+});
+orbitBtn.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  orbitBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+});
+orbitBtn.setAttribute('aria-pressed', String(controls.autoRotate));
+
+{
+  let px = 0, py = 0;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (follow < 0) return; followDrag = true; px = e.clientX; py = e.clientY;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* */ }
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!followDrag || follow < 0) return;
+    followYaw -= (e.clientX - px) * 0.006;
+    followPitch = clamp(followPitch - (e.clientY - py) * 0.003, -0.2, 1.0);
+    px = e.clientX; py = e.clientY;
+  });
+  const up = () => { followDrag = false; };
+  canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+  canvas.addEventListener('wheel', (e) => {
+    if (follow < 0) return; e.preventDefault();
+    followZoom = clamp(followZoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 2.2);
+  }, { passive: false });
+}
+
+// night / golden hour
+let timeTarget = 0, timeV = 0, nightOn = false;
+const nightBtn = document.getElementById('night');
+const setTime = (v) => {
+  timeTarget = clamp(v);
+  nightOn = timeTarget > 0.5;
+  nightBtn.setAttribute('aria-pressed', String(nightOn));
+  nightBtn.textContent = nightOn ? 'Golden hour' : 'Night';
+};
+nightBtn.addEventListener('click', () => setTime(nightOn ? 0 : 1));
+
+VIEWS.fireworks = { pos: new THREE.Vector3(LK.cx + 110, 70, LK.cz + 90), target: new THREE.Vector3(LK.cx, 24, LK.cz) };
+document.getElementById('fwview').addEventListener('click', () => {
+  stopFollow(); controls.autoRotate = false; orbitBtn.setAttribute('aria-pressed', 'false');
+  if (!nightOn) nightBtn.click();
+  if (lanternOn) endLantern();
+  if (wxMode === 1) { wxMode = 0; wxBtn.textContent = WX[0]; wxBtn.setAttribute('aria-pressed', 'false'); }
+  flyTo(VIEWS.fireworks);
+});
+
+const FOG_DAY = FOG.clone(), FOG_DUSK = col('#b08098'), FOG_NIGHT = col('#161428');
+const HEMI_DAY = hemiLight.color.clone(), HEMI_NIGHT = col('#3a4a88');
+const SUNC_DAY = sunLight.color.clone(), SUNC_DUSK = col('#ff6a4a');
+
+// weather
+const WX = ['Clear sky', 'Rain', 'Mist'];
+let wxMode = 0, wxRain = 0, wxMist = 0;
+const wxBtn = document.getElementById('weather');
+wxBtn.addEventListener('click', () => {
+  wxMode = (wxMode + 1) % 3; wxBtn.textContent = WX[wxMode]; wxBtn.setAttribute('aria-pressed', String(wxMode > 0));
+});
+const RAIN_N = 5000, RB = 160, RH = 110, rainSeed = new Float32Array(RAIN_N * 4), rainPos = new Float32Array(RAIN_N * 6);
+for (let i = 0; i < RAIN_N; i++) { rainSeed[i * 4] = R() * RB; rainSeed[i * 4 + 1] = R() * RB; rainSeed[i * 4 + 2] = R(); rainSeed[i * 4 + 3] = rnd(0.8, 1.2); }
+const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: col('#dfe4f4'), transparent: true, opacity: 0, depthWrite: false, fog: false }));
+rain.frustumCulled = false; rain.visible = false; scene.add(rain);
+const wrap = (v, lo, span) => lo + ((((v - lo) % span) + span) % span);
+function updateRain(t) {
+  const c = camera.position, x0 = c.x - RB / 2, z0 = c.z - RB / 2, y0 = c.y - RH * 0.6;
+  for (let i = 0; i < RAIN_N; i++) {
+    const sp = rainSeed[i * 4 + 3], x = wrap(rainSeed[i * 4] + t * 5, x0, RB), z = wrap(rainSeed[i * 4 + 1], z0, RB), y = wrap(rainSeed[i * 4 + 2] * RH - t * 70 * sp, y0, RH);
+    rainPos.set([x, y, z, x - 0.35, y + 2.6 * sp, z], i * 6);
+  }
+  rainGeo.attributes.position.needsUpdate = true;
+}
+
+// lantern show
+let lanternOn = false, lanternT = 0;
+const lanternBtn = document.getElementById('lantern');
+const endLantern = () => { lanternOn = false; lanternBtn.setAttribute('aria-pressed', 'false'); lanterns.forEach((L) => { L.g.visible = false; }); };
+lanternBtn.addEventListener('click', () => {
+  if (lanternOn) { endLantern(); return; }
+  stopFollow(); controls.autoRotate = false; orbitBtn.setAttribute('aria-pressed', 'false');
+  if (timeTarget < 0.95) setTime(1);
+  VIEWS.lantern = { pos: new THREE.Vector3(LK.cx + 55, 22, LK.cz + 70), target: new THREE.Vector3(LK.cx, 18, LK.cz - 10) };
+  flyTo(VIEWS.lantern);
+  lanternOn = true; lanternT = 0; lanternBtn.setAttribute('aria-pressed', 'true');
+  lanterns.forEach((L) => { L.g.visible = true; L.h = rnd(6, 20); });
+});
+
+function updateLanterns(t, dt) {
+  if (!lanternOn) return;
+  lanternT += dt;
+  for (const L of lanterns) {
+    L.h += dt * 3.5;
+    if (L.h > 70) L.h = rnd(6, 16);
+    const a = L.a + t * L.sp;
+    const x = LK.cx + Math.cos(a) * L.r + Math.sin(t * 0.7 + L.ph) * 2;
+    const z = LK.cz + Math.sin(a) * L.r + Math.cos(t * 0.5 + L.ph) * 2;
+    L.g.position.set(x, WATER_Y + L.h, z);
+    L.gl.material.opacity = 0.55 + 0.35 * Math.sin(t * 2 + L.ph);
+  }
+  if (lanternT > 48) endLantern();
+}
+
+// sound
+let AC = null, master = null, soundOn = false;
+const snd = {};
+const soundBtn = document.getElementById('sound');
+function initAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return false;
+  AC = new Ctx(); master = AC.createGain(); master.gain.value = 0; master.connect(AC.destination);
+  const buf = (sec, fill) => { const b = AC.createBuffer(1, Math.floor(AC.sampleRate * sec), AC.sampleRate); fill(b.getChannelData(0)); return b; };
+  snd.white = buf(3, (d) => { for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; });
+  snd.brown = buf(4, (d) => { let l = 0; for (let i = 0; i < d.length; i++) { l = (l + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = l * 3.5; } });
+  snd.crackle = buf(1.4, (d) => { for (let i = 0; i < d.length; i++) d[i] = Math.random() < 0.0016 ? (Math.random() * 2 - 1) * (1 - i / d.length) : 0; });
+  const loop = (b, ...nodes) => {
+    const s = AC.createBufferSource(); s.buffer = b; s.loop = true; let n = s;
+    for (const x of nodes) { n.connect(x); n = x; }
+    const g = AC.createGain(); g.gain.value = 0; n.connect(g); g.connect(master); s.start(); return g;
+  };
+  const filt = (type, f, q) => { const b = AC.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; };
+  snd.city = loop(snd.brown, filt('lowpass', 180));
+  snd.rain = loop(snd.white, filt('highpass', 900), filt('lowpass', 7000));
+  snd.lake = loop(snd.brown, filt('lowpass', 320));
+  snd.filt = filt; snd.nextHorn = 0;
+  return true;
+}
+soundBtn.addEventListener('click', () => {
+  if (!AC && !initAudio()) { soundBtn.textContent = 'No sound'; return; }
+  soundOn = !soundOn; if (AC.state === 'suspended') AC.resume();
+  master.gain.setTargetAtTime(soundOn ? 0.85 : 0, AC.currentTime, 0.25);
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+  soundBtn.textContent = soundOn ? 'Sound on' : 'Sound off';
+});
+const oneShot = (b, when, gain, decay, ...nodes) => {
+  const s = AC.createBufferSource(); s.buffer = b; let n = s;
+  for (const x of nodes) { n.connect(x); n = x; }
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0, when); g.gain.linearRampToValueAtTime(gain, when + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0008, when + decay);
+  n.connect(g); g.connect(master); s.start(when); s.stop(when + decay + 0.1);
+};
+function sfxBoom(x, y, z) {
+  if (!AC || !soundOn) return;
+  const d = camera.position.distanceTo(tmpV.set(x, y, z)), when = AC.currentTime + Math.min(1.2, d / 420), g = clamp(140 / d, 0.06, 0.85);
+  oneShot(snd.brown, when, g * 1.5, 1.3, snd.filt('lowpass', rnd(110, 220)));
+  oneShot(snd.white, when, g * 0.22, 0.3, snd.filt('bandpass', 900, 0.8));
+}
+function updateSound(t, n) {
+  if (!AC || !soundOn) return;
+  const now = AC.currentTime, hgt = clamp((camera.position.y - 20) / 350);
+  snd.city.gain.setTargetAtTime(0.28 * (1 - 0.35 * n) * (1 - 0.5 * hgt), now, 0.5);
+  snd.lake.gain.setTargetAtTime(0.12 * (1 - 0.3 * hgt), now, 0.5);
+  snd.rain.gain.setTargetAtTime(0.16 * wxRain, now, 0.5);
+  if (t > snd.nextHorn) {
+    snd.nextHorn = t + rnd(5, 12);
+    const f0 = rnd(380, 540), g = 0.018 * (1 - 0.6 * hgt), w = now;
+    const o = AC.createOscillator(), og = AC.createGain(), lp = snd.filt('lowpass', 1600);
+    o.type = 'square'; o.frequency.value = f0; o.connect(lp); lp.connect(og); og.connect(master);
+    og.gain.setValueAtTime(0, w); og.gain.linearRampToValueAtTime(g, w + 0.01);
+    og.gain.setValueAtTime(g, w + 0.1); og.gain.linearRampToValueAtTime(0, w + 0.14);
+    o.start(w); o.stop(w + 0.18);
+  }
+}
+
+// night update
+const nightC = new THREE.Color();
+function updateNight(t, dt) {
+  timeV += clamp(timeTarget - timeV, -dt * 0.35, dt * 0.35);
+  const n = uNight.value = sstep(0.3, 0.95, timeV), dusk = sstep(0, 0.45, timeV);
+  SUN.copy(dirAzEl(-42 * DEG, lerp(4, -8, sstep(0, 0.7, timeV)) * DEG));
+  sun.position.copy(SUN).multiplyScalar(3000);
+  sun.material.opacity = 1 - sstep(0.2, 0.5, timeV);
+  moon.material.opacity = n * 0.85;
+  if (window.__stars) window.__stars.material.opacity = n * 0.9;
+  FOG.copy(FOG_DAY).lerp(FOG_DUSK, dusk * (1 - n)).lerp(FOG_NIGHT, n);
+  hemiLight.intensity = lerp(0.95, 0.4, n); hemiLight.color.copy(HEMI_DAY).lerp(HEMI_NIGHT, n);
+  sunLight.intensity = lerp(1.25, 0.7, dusk) * (1 - n); sunLight.color.copy(SUNC_DAY).lerp(SUNC_DUSK, dusk);
+  fillLight.intensity = lerp(0.28, 0.4, n);
+  scene.fog.color.copy(FOG);
+
+  // lamps & windows
+  const te = Math.max(timeV, wxRain * 0.3);
+  for (const L of LAMP_POS) {
+    L.gl.material.opacity = sstep(0.08, 0.4, te) * 0.85;
+    L.head.material.color.set(te > 0.2 ? '#fff2d0' : '#b0a8c0');
+  }
+  scene.traverse((o) => {
+    if (o.userData && o.userData.winGlow) o.material.opacity = sstep(0.1, 0.55, te) * 0.7;
+    if (o.userData && o.userData.bridgeLantern) o.material.opacity = sstep(0.05, 0.35, te) * 0.9;
+  });
+  if (turtleTower.userData.glow) turtleTower.userData.glow.material.opacity = sstep(0.15, 0.5, te) * 0.8;
+  for (const m of winMats) {
+    const on = te > 0.25;
+    m.color.set(on ? '#ffd8a0' : '#1a1830');
+  }
+  for (const s of scooters) s.headlight.material.opacity = n * 0.75;
+
+  updateFireworks(t, dt, timeV > 0.6 && wxRain < 0.3 && !lanternOn);
+  updateLanterns(t, dt);
+  updateSound(t, n);
+
+  // weather
+  wxRain += ((wxMode === 1 ? 1 : 0) - wxRain) * Math.min(1, dt * 0.5);
+  wxMist += ((wxMode === 2 ? 1 : 0) - wxMist) * Math.min(1, dt * 0.5);
+  const wet = Math.max(wxRain, wxMist * 0.85);
+  uWet.value = wet * 0.85;
+  scene.fog.near = FOG_NEAR * (1 - 0.9 * wet);
+  scene.fog.far = FOG_FAR * (1 - 0.75 * wxRain - 0.85 * wxMist * (1 - wxRain));
+  rain.visible = wxRain > 0.01; rain.material.opacity = 0.4 * wxRain * (1 - 0.35 * n);
+  if (rain.visible) updateRain(t);
+  sunLight.intensity *= 1 - 0.7 * wet;
+}
+
+// flag wave
+function updateFlag(t) {
+  const f = flagTower.userData.flag;
+  if (!f) return;
+  f.rotation.y = Math.sin(t * 2.2) * 0.15;
+  f.scale.x = 1 + Math.sin(t * 3.1) * 0.04;
+}
+
+// ---------------------------------------------------------------- loop
+const clock = new THREE.Clock();
+const tmpV = new THREE.Vector3();
+let t = 0, lastFrame = -1e9;
+const still = reduceMotion;
+function frame(now) {
+  if (LOW_POWER && now - lastFrame < 32) { requestAnimationFrame(frame); return; }
+  lastFrame = now;
+  const dt = Math.min(0.05, clock.getDelta());
+  if (!still) t += dt;
+  uTime.value = t;
+  if (fly) {
+    fly.t = Math.min(1, fly.t + dt / 1.6);
+    const k = sstep(0, 1, fly.t);
+    camera.position.lerpVectors(fly.p0, fly.to.pos, k);
+    controls.target.lerpVectors(fly.q0, fly.to.target, k);
+    if (fly.t >= 1) fly = null;
+  }
+  controls.update();
+  if (inDisc(camera.position.x, camera.position.z, 2)) {
+    const gy = H(camera.position.x, camera.position.z) + 3;
+    if (camera.position.y < gy) camera.position.y = gy;
+  }
+  skyGroup.position.copy(camera.position);
+  updateClouds(t);
+  updateNight(t, dt);
+  updateTraffic(dt);
+  updateFlag(t);
+
+  if (follow >= 0) {
+    const s = scooters[follow], q = s.q;
+    const back = 12 * followZoom;
+    const fx = q.x - Math.sin(q.yaw + followYaw) * back;
+    const fz = q.z - Math.cos(q.yaw + followYaw) * back;
+    const fy = q.y + 5 + followPitch * 10;
+    camera.position.lerp(tmpV.set(fx, fy, fz), 1 - Math.exp(-dt * 3));
+    controls.target.lerp(new THREE.Vector3(q.x, q.y + 1.2, q.z), 1 - Math.exp(-dt * 3));
+  }
+
+  renderer.setRenderTarget(rt); renderer.render(scene, camera);
+  renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  requestAnimationFrame(frame);
+}
+loadingEl.hidden = true;
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
